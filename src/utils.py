@@ -14,6 +14,9 @@ def accuracy_fn(y_true, y_pred): # from https://github.com/mrdbourke/pytorch-dee
     acc = (correct / len(y_pred)) * 100
     return acc
 
+# Function to count model complexity
+def count_parameters(model): return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 # Functions for plotting weights
 
 # Function for plotting only weights
