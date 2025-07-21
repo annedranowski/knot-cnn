@@ -59,19 +59,19 @@ class KnotsModelCNN(nn.Module):
         super().__init__()
 
         self.conv_1 = nn.Sequential(
-          nn.Conv2d(1, 4, kernel_size=16, stride=1, dilation=2, padding=0),
+          nn.Conv2d(1, 4, kernel_size=11, stride=1, dilation=2, padding=0),
           nn.BatchNorm2d(4),
           nn.ReLU(),
 
           nn.MaxPool2d(kernel_size=2),
 
-          nn.Conv2d(4, 16, kernel_size=6, stride=1, dilation=2, padding=0),
+          nn.Conv2d(4, 16, kernel_size=5, stride=1, dilation=2, padding=0),
           nn.BatchNorm2d(16),
           nn.ReLU(),
 
           nn.MaxPool2d(kernel_size=2),
 
-          nn.Conv2d(16, 64, kernel_size=4, stride=1, dilation=2, padding=0),
+          nn.Conv2d(16, 64, kernel_size=3, stride=1, dilation=2, padding=0),
           nn.BatchNorm2d(64),
           nn.ReLU(),
 
@@ -83,8 +83,8 @@ class KnotsModelCNN(nn.Module):
 
           nn.MaxPool2d(kernel_size=2),
 
-          nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=0),
-          nn.BatchNorm2d(256),
+          nn.Conv2d(256, 361, kernel_size=3, stride=1, padding=0),
+          nn.BatchNorm2d(361),
           nn.ReLU(),
 
           nn.MaxPool2d(kernel_size=2),
@@ -92,9 +92,22 @@ class KnotsModelCNN(nn.Module):
 
         self.classifier = nn.Sequential(
             nn.Flatten(),
+            nn.BatchNorm1d(361*(12)**2),
 
-            nn.Linear(in_features=256*(11)**2,
-                      out_features=output_shape)
+            nn.Dropout(p=0.7),
+
+            nn.Linear(in_features=361*(12)**2,
+                      out_features=4096),
+            nn.BatchNorm1d(4096),
+            nn.ReLU(),
+
+            nn.Dropout(p=0.7),
+
+            nn.Linear(in_features=4096,
+                      out_features=4096),
+            nn.ReLU(),
+
+            nn.Linear(4096, output_shape)
         )
 
     def forward(self, x: torch.Tensor):
