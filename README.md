@@ -1,18 +1,20 @@
-# Knot Recognition ML Project
+# 🪢 Knot Recognition with CNN
 
-This repo contains code for training and evaluating models (Vanilla, CNN) on knot images, supporting both local Mac and Google Colab environments.
+This repository contains a lightweight convolutional neural network (CNN) for **detecting knots in images**.  
+It includes:  
+- A **training pipeline** (`src/train.py`)  
+- **Dataset utilities** (`src/dataset.py`)  
+- A **model definition** (`src/models.py`)  
+- A **clean demo notebook** (`notebooks/knot_detector.ipynb`)  
 
-## Getting Started
+The project is structured for easy **local training**, **evaluation**, and future **deployment on Hugging Face Spaces**.
 
-### Local (Mac/Linux)
+---
 
-1. Clone the repo: 
+## 🚀 Quickstart
 
-```
-git clone https://github.com/YOUR_USERNAME/knot-ml.git
-cd knot-ml
-```
+### 1. Clone the repository
 
-2. Install requirements: `pip install -r requirements.txt`
-
-3. Run the main notebook: TODO
+```bash
+git clone https://github.com/annedranowski/knot-cnn.git
+cd knot-cnn
