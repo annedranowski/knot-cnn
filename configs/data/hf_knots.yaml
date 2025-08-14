@@ -1,0 +1,6 @@
+repo_id: tr33hugg3r/knot-crossings   # your HF dataset
+revision: main                       # or a tag/commit when you want to freeze
+dest_root: data/raw                  # where snapshots live locally
+
+# convenience (derived at runtime)
+# local_root = f"{dest_root}/knot-crossings@{revision}"
