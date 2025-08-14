@@ -1,5 +1,9 @@
 # ignore data
-dataset/
+# dataset/
+data/
+outputs/
+*.pt
+
 
 # ignore??
 *.pth
