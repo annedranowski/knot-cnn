@@ -6,3 +6,5 @@ numpy
 tqdm
 Pillow
 huggingface_hub>=0.23
+# optional: speeds up downloads
+hf_transfer>=0.1.6
