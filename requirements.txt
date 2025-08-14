@@ -5,3 +5,4 @@ pandas
 numpy
 tqdm
 Pillow
+huggingface_hub>=0.23
