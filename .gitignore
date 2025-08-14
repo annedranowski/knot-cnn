@@ -1,7 +1,15 @@
 # ignore data
+
+# ignore only top-level data & outputs
+/data/*
+/outputs/
+
+# but keep these docs/placeholders tracked
+!/data/README.md
+!/data/.gitkeep
 # dataset/
-data/
-outputs/
+# data/
+# outputs/
 *.pt
 
 
