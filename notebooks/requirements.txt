@@ -1,0 +1,5 @@
+torch
+torchvision
+huggingface_hub
+datasets
+hf_transfer
