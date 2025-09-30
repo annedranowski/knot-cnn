@@ -1,26 +1,7 @@
 import torch
+from torchvision import transforms
 
-def accuracy_fn(y_true, y_pred): # from https://github.com/mrdbourke/pytorch-deep-learning/blob/main/helper_functions.py
-    """Calculates accuracy between truth labels and predictions.
-
-    Args:
-        y_true (torch.Tensor): Truth labels for predictions.
-        y_pred (torch.Tensor): Predictions to be compared to predictions.
-
-    Returns:
-        [torch.float]: Accuracy value between y_true and y_pred, e.g. 78.45
-    """
-    correct = torch.eq(y_true, y_pred).sum().item()
-    acc = (correct / len(y_pred)) * 100
-    return acc
-
-# Function to count model complexity
-def count_parameters(model): return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-# Functions for plotting weights
-
-# Function for plotting only weights
-def plot_weights(layers: list): 
+def plot_weights(layers: list):
   fig, axs = plt.subplots(ncols=1, nrows=len(layers), figsize=(7, 7*len(layers)))
   for i, layer in enumerate(layers):
     if type(layer) == torch.nn.modules.linear.Linear:
@@ -28,11 +9,11 @@ def plot_weights(layers: list):
       siz = int(weight.shape[0]**(1/2))
       weight = torch.unflatten(weight, dim=0, sizes=(siz, siz))
     elif type(layer) == torch.nn.modules.conv.Conv2d:
-      weight = torch.sum(torch.sum(layer.weight, dim=0), dim=0)
+      if 1 not in layer.kernel_size:
+        weight = torch.sum(torch.sum(layer.weight, dim=0), dim=0)
     axs[i].imshow(weight.cpu().detach().numpy())
-      
-# Function for plotting weights and intermediate results
-def plot_weights_image(layers: list, func_length: int, img: torch.Tensor): 
+
+def plot_weights_image(layers: list, func_length: int, img: torch.Tensor):
   fig, axs = plt.subplots(ncols=2, nrows=func_length, figsize=(2*7, 7*func_length))
   i = -1
   for layer in layers:
@@ -77,3 +58,15 @@ def plot_weights_image(layers: list, func_length: int, img: torch.Tensor):
       pass
     else:
       img = layer(img.cuda()).cpu()
+
+def plot_weights_image_cvt(model, img):
+  fig, axs = plt.subplots(ncols=(len(model.stages)+1)//2, nrows=2, figsize=((len(model.stages)+1)//2*7, 2*7))
+  axs[0][0].axis('off')
+  axs[0][0].text(0.5, -0.01, "Original image", ha='center', va='top', transform=axs[0][0].transAxes, fontsize=20)
+  axs[0][0].imshow(torch.sum(img, dim=1).permute(1, 2, 0).detach().numpy())
+  for i, layer in enumerate(model.stages):
+    img = layer(img)
+    img_show = torch.sum(img, dim=1)
+    axs[(i+1)//2][(i+1)%2].axis('off')
+    axs[(i+1)//2][(i+1)%2].text(0.5, -0.01, f"After {i+1} stage", ha='center', va='top', transform=axs[(i+1)//2][(i+1)%2].transAxes, fontsize=20)
+    axs[(i+1)//2][(i+1)%2].imshow(img_show.permute(1, 2, 0).squeeze(dim=0).detach().numpy())
