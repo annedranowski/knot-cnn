@@ -1,44 +1,175 @@
-import torch
-from torch import nn
-from torch.optim import Adam
-from pathlib import Path
-from .models import KnotCNN
-from .data.dataset import get_dataloaders
-from .eval import evaluate
+import gc
+import time
+import helper_functions
 
-def train_model(data_root, num_epochs=10, lr=1e-3, batch_size=32, device=None):
-    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    train_dl, val_dl = get_dataloaders(data_root, batch_size=batch_size)
+def train_step(model: torch.nn.Module,
+               epoch: int,
+               start_epoch: int,
+               data_loader: torch_xla.distributed.parallel_loader.MpDeviceLoader,
+               loss_fn: torch.nn.Module,
+               optimizer: torch.optim.Optimizer,
+               accuracy_fn,
+               scheduler: torch.optim.lr_scheduler = None):
+    train_loss, train_acc = 0, 0
+    y_pred_train, y_target_train = [], []
+    times_epoch = []
 
-    model = KnotCNN(num_classes=len(train_dl.dataset.classes)).to(device)
-    optimizer = Adam(model.parameters(), lr=lr)
-    criterion = nn.CrossEntropyLoss()
+    optimizer.zero_grad()
+    for i, (X, y) in enumerate(tqdmn(data_loader)):
+        start = time.time()
 
-    for epoch in range(num_epochs):
-        model.train()
-        running_loss = 0.0
-        for xb, yb in train_dl:
-            xb, yb = xb.to(device), yb.to(device)
-            optimizer.zero_grad()
-            preds = model(xb)
-            loss = criterion(preds, yb)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
+        X, y = X.to(device).to(X.dtype), y.to(device).to(y.dtype)
 
-        val_metrics = evaluate(model, val_dl, device=device)
-        print(f"Epoch {epoch+1}/{num_epochs} "
-              f"Train Loss: {running_loss/len(train_dl):.4f} "
-              f"Val Acc: {val_metrics['accuracy']:.2%}")
+        y_pred = model(X).squeeze(dim=1)
 
-    return model
+        """for i in y_pred.detach().cpu().tolist():
+          y_pred_train.append(round(i))
+        for i in y.detach().cpu().tolist():
+          y_target_train.append(round(i))"""
 
-if __name__ == "__main__":
-    import argparse
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--data-root", required=True)
-    ap.add_argument("--epochs", type=int, default=10)
-    ap.add_argument("--batch-size", type=int, default=32)
-    ap.add_argument("--lr", type=float, default=1e-3)
-    args = ap.parse_args()
-    train_model(args.data_root, num_epochs=args.epochs, lr=args.lr, batch_size=args.batch_size)
+        loss = loss_fn(y_pred, y.type(torch.float32))
+        train_loss += loss
+        train_acc += accuracy_fn(y_true=y,
+                                 y_pred=y_pred.round())
+
+        loss.backward()
+
+        if (i+1) % (BATCH_SIZE//8) == 0:
+          xm.optimizer_step(optimizer)
+          optimizer.zero_grad()
+
+        times_epoch.append(time.time()-start)
+
+        xm.mark_step()
+
+    # Calculate loss and accuracy per epoch and print out what's happening
+    train_loss /= len(data_loader)
+    train_acc /= len(data_loader)
+    print("\nTrain loss: {:.5f} | Train accuracy: {:.2f}%".format(train_loss, train_acc))
+
+    if scheduler != None and epoch >= start_epoch:
+      try:
+        scheduler.step(train_loss)
+      except:
+        scheduler.step()
+    lrs.append(optimizer.param_groups[0]['lr'])
+
+    del y_pred, loss
+    return y_pred_train, y_target_train, train_loss.detach().cpu().numpy(), train_acc, times_epoch
+
+def test_step(model: torch.nn.Module,
+              data_loader: torch_xla.distributed.parallel_loader.MpDeviceLoader,
+              loss_fn: torch.nn.Module,
+              accuracy_fn,
+              scheduler: torch.optim.lr_scheduler = None,
+              threshold: float = 0.001,
+              device: torch.device = device,
+              save_path: str = None,
+              fold: int = None):
+    test_loss, test_acc = 0, 0
+    y_pred_test, y_target_test = [], []
+    with torch.no_grad():
+      model.eval()
+      for X, y in data_loader:
+          gc.collect()
+
+          X, y = X.to(device).to(X.dtype), y.to(device).to(y.dtype)
+
+          test_pred = model(X).squeeze(dim=1)
+
+          """for i in test_pred.detach().cpu().tolist():
+            y_pred_test.append(round(i))
+          for i in y.detach().cpu().tolist():
+            y_target_test.append(round(i))"""
+
+          test_loss += loss_fn(test_pred, y.type(torch.float32))
+          test_acc += accuracy_fn(y_true=y,
+              y_pred=test_pred.round() # Go from logits -> pred labels
+          )
+
+          xm.mark_step()
+
+      test_loss /= len(data_loader)
+      test_acc /= len(data_loader)
+
+      if fold != None:
+        if test_acc > best_acc:
+          best_fold = fold
+          if save_path != None:
+            try:
+              os.mkdir(save_path + f'{model.__class__.__name__}_best.pth')
+            except:
+              pass
+            torch.save(model.state_dict(), save_path + f'/{model.__class__.__name__}_best.pth')
+      elif save_path != None:
+        try:
+          os.mkdir(save_path + f'{model.__class__.__name__}_best.pth')
+        except:
+          pass
+        torch.save(model.state_dict(), save_path + f'/{model.__class__.__name__}_best.pth')
+
+      print("\nTest loss: {:.5f} | Test accuracy: {:.2f}%\n".format(test_loss, test_acc))
+
+      return test_pred, y_target_test, test_loss.cpu().detach().numpy(), test_acc
+
+y_pred_train, y_target_train, train_losses, train_accuracies = torch.Tensor(), torch.Tensor(), [], []
+y_pred_test, y_target_test, test_losses, test_accuracies = torch.Tensor(), torch.Tensor(), [], []
+times = []
+def train_fn(index: int,
+            model: torch.nn.Module,
+            start_epoch: int,
+            train_data_loader: torch_xla.distributed.parallel_loader.MpDeviceLoader,
+            valid_dataloader: torch_xla.distributed.parallel_loader.MpDeviceLoader,
+            loss_fn: torch.nn.Module,
+            optimizer: torch.optim.Optimizer,
+            accuracy_fn: helper_functions = None,
+            num_epochs: int = None,
+            scheduler: torch.optim.lr_scheduler = None):
+  for epoch in tqdmn(range(num_epochs)):
+    gc.collect()
+    print(f"Epoch {epoch+1}/{num_epochs}")
+
+    start = time.time()
+    y_pred_train, y_target_train, train_loss, train_acc, times_epoch = train_step(
+               model,
+               epoch,
+               start_epoch,
+               train_data_loader,
+               loss_fn,
+               optimizer,
+               accuracy_fn,
+               scheduler)
+    end = time.time()
+    print(f'Train {epoch+1} epoch : {end-start} s')
+    train_losses.append(train_loss); train_accuracies.append(train_acc)
+    times.append(times_epoch)
+
+    print('----------')
+
+  start = time.time()
+  y_pred_test, y_target_test, test_loss, test_acc = test_step(
+              model,
+              valid_data_loader,
+              loss_fn,
+              accuracy_fn,
+              scheduler=scheduler)
+  end = time.time()
+  print(f'Test {epoch+1} epoch : {end-start} s')
+  test_losses.append(test_loss); test_accuracies.append(test_acc)
+
+def train_loop(model: torch.nn.Module,
+               start_epoch: int,
+               train_data_loader: torch_xla.distributed.parallel_loader.MpDeviceLoader,
+               valid_dataloader: torch_xla.distributed.parallel_loader.MpDeviceLoader,
+               loss_fn: torch.nn.Module,
+               optimizer: torch.optim.Optimizer,
+               accuracy_fn: helper_functions = None,
+               num_epochs: int = None,
+               scheduler: torch.optim.lr_scheduler = None):
+  os.environ["XLA_TPU_DEVICES"] = ",".join([f"tpu_device_{i}" for i in range(8)])
+  xmp.spawn(
+        train_fn,
+        args=(model, start_epoch, train_data_loader, valid_dataloader, loss_fn, optimizer, accuracy_fn, num_epochs, scheduler),
+        nprocs=1,
+        start_method='fork'
+    )
