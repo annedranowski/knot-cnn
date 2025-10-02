@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# Vanilla
 class KnotsModelVanila(nn.Module):
-    def __init__(self, input_shape: int, hidden_units_1: int, hidden_units_2: int, hidden_units_3:int, hidden_units_4: int, output_shape: int): # try to change the number of hidden layers
+    def __init__(self, input_shape: int, hidden_units_1: int, hidden_units_2: int, hidden_units_3:int, hidden_units_4: int, output_shape: int):
         super().__init__()
         self.dropout = nn.Dropout(p=0.9)
 
@@ -36,25 +37,16 @@ class KnotsModelVanila(nn.Module):
 
     def forward(self, x: torch.Tensor):
       x = self.layer_prepare(x)
-      #x = self.dropout(x)
       x = self.layer_1(x)
-      #x = self.dropout(x)
       x = self.layer_2(x)
-      #x = self.dropout(x)
       x = self.layer_3(x)
-      #x = self.dropout(x)
       x = self.layer_4(x)
       x = self.dropout(x)
       x = self.layer_5(x)
       return x
 
+# CNN
 class KnotsModelCNN(nn.Module):
-    """
-    Model architecture copying TinyVGG from:
-    https://poloclub.github.io/cnn-explainer/
-
-    To understand how it works, I highly recommend you go through the 'Convolutional Neural Networks' section at https://colah.github.io/ (of course, the other articles are very good too, so it's best to read them all!)
-    """
     def __init__(self, output_shape: int):
         super().__init__()
 
@@ -112,10 +104,10 @@ class KnotsModelCNN(nn.Module):
 
     def forward(self, x: torch.Tensor):
       x = self.conv_1(x)
-      #print(x.shape)
       x = self.classifier(x)
       return x
 
+# CvT
 class ConvEmbedding(nn.Module):
   def __init__(self, patch_size, stride, in_dim, embed_dim):
     super().__init__()
@@ -146,7 +138,6 @@ class ConvEmbedding(nn.Module):
 
   def forward(self, x):
     x = self.embed_conv(x) # [B, in_dim, H, W] -> [B, embed_dim, H//stride, W//stride] = [B, C, H', W']
-    #x = self.dropout(x)
     B, C, H, W = x.shape
     x = x.flatten(2).transpose(1, 2) # [B, C, H', W'] -> [B, C, H'*W'] -> [B, H'*W', C]
     x = self.norm(x)
@@ -223,11 +214,8 @@ class ConvProj(nn.Module):
     v = self.v_proj(x) # [B, C, H, W] -> [B, embed_dim, H//2, W//2]
 
     q = self.reshape_head(q) # [B, embed_dim, H, W] = [B, num_heads*head_dim, H, W] -> [B, num_heads, head_dim, H*W] -> [B, H*W, num_heads, head_dim]
-    #q = self.dropout(q) + torch.full_like(q, 1e-5, dtype=torch.bfloat16)
     k = self.reshape_head(k) # [B, embed_dim, H//2, W//2] -> [B, H//2*W//2, num_heads, head_dim]
-    #k = self.dropout(k) + torch.full_like(k, 1e-5, dtype=torch.bfloat16)
     v = self.reshape_head(v) # [B, embed_dim, H//2, W//2] -> [B, H//2*W//2, num_heads, head_dim]
-    #v = self.dropout(v) + torch.full_like(v, 1e-5, dtype=torch.bfloat16)
 
     return q, k, v
 
@@ -290,7 +278,6 @@ class ConvTransformerBlock(nn.Module):
     out_mlp = self.mlp(out_attn) # [B, H*W, embed_dim+C]
 
     out = self.lin_reshape(out_attn + out_mlp) # [B, H*W, embed_dim]
-    #out = self.lin_dropout(out)
 
     return out
 
@@ -346,9 +333,6 @@ class KnotsModelCvT(nn.Module):
     for stage in self.stages:
       x = stage(x)
 
-    #print(x.shape)
-
-    #x = self.dropout(x)
     x = self.weighted_sum(x)
     x = x.mean(dim=1).unsqueeze(dim=1)
 
