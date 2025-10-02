@@ -1,26 +1,12 @@
 import torch
 import torch_xla
 
-from helper_functions import accuracy_fn
+from accuracy_fn import accuracy_fn
 
 def eval_model(model: torch.nn.Module,
                data_loader: torch_xla.distributed.parallel_loader.MpDeviceLoader,
                loss_fn: torch.nn.Module,
                accuracy_fn):
-    """Evaluates a given model on a given dataset.
-
-    Args:
-        model (torch.nn.Module): A PyTorch model capable of making predictions on data_loader.
-        data_loader (torch.utils.data.DataLoader): The target dataset to predict on.
-        loss_fn (torch.nn.Module): The loss function of model.
-        accuracy_fn: An accuracy function to compare the models predictions to the truth labels.
-        device (str, optional): Target device to compute on. Defaults to device.
-
-    Returns:
-        (dict): Results of model making predictions on data_loader.
-        (list): model's predictions
-        (list): target values
-    """
     y_pred_eval = []; y_target_eval = []
     loss, acc = 0, 0
     model.eval()
