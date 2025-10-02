@@ -1,4 +1,4 @@
-# Basic function to evaluate model's accuracy
+# Function to evaluate model's accuracy
 
 import torch
 
