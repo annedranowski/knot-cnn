@@ -1,3 +1,5 @@
+# Basic function to evaluate model's accuracy
+
 import torch
 
 def accuracy_fn(y_true, y_pred): #from https://github.com/mrdbourke/pytorch-deep-learning
