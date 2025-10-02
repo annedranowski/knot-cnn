@@ -1,4 +1,4 @@
-# Function to assess the model
+# Function to assess a model
 
 import torch
 import torch_xla
