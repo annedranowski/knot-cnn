@@ -1,11 +1,12 @@
 import torch
+import torch_xla
+
 from helper_functions import accuracy_fn
 
 def eval_model(model: torch.nn.Module,
-               data_loader: torch.utils.data.DataLoader,
+               data_loader: torch_xla.distributed.parallel_loader.MpDeviceLoader,
                loss_fn: torch.nn.Module,
-               accuracy_fn,
-               device: torch.device = device):
+               accuracy_fn):
     """Evaluates a given model on a given dataset.
 
     Args:
@@ -17,20 +18,20 @@ def eval_model(model: torch.nn.Module,
 
     Returns:
         (dict): Results of model making predictions on data_loader.
+        (list): model's predictions
+        (list): target values
     """
     y_pred_eval = []; y_target_eval = []
     loss, acc = 0, 0
     model.eval()
     with torch.inference_mode():
         for X, y in data_loader:
-            # Send data to the target device
-            X, y = X.to(device), y.to(device)
             y_pred = model(X).squeeze(dim=1)
             loss += loss_fn(y_pred, y)
             acc += accuracy_fn(y_true=y,
                                 y_pred=y_pred.round())
 
-            X.to('cpu'), y.to('cpu'), y_pred.to('cpu')
+            y.to('cpu'), y_pred.to('cpu')
             y_pred_eval.append(y_pred.round())
             y_target_eval.append(y)
 
