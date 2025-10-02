@@ -1,3 +1,5 @@
+# Slightly rewritten pytorch ImageFolder class
+
 from torchvision.datasets import VisionDataset
 import os
 import os.path
