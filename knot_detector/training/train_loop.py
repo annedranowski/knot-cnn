@@ -1,3 +1,5 @@
+# Functions used to train a model
+
 import gc
 
 import time
@@ -10,6 +12,7 @@ import torch
 import torch_xla
 import torch_xla.core.xla_model as xm
 
+# Basic functions which perform one step
 def train_step(model: torch.nn.Module,
                epoch: int,
                start_epoch: int,
@@ -87,9 +90,12 @@ def test_step(model: torch.nn.Module,
 
       return test_pred, y_target_test, test_loss.cpu().detach().numpy(), test_acc
 
+# Different statistics; used to plot time usage/learning rate's changes/confusion matrices etc.
 y_pred_train, y_target_train, train_losses, train_accuracies = torch.Tensor(), torch.Tensor(), [], []
 y_pred_test, y_target_test, test_losses, test_accuracies = torch.Tensor(), torch.Tensor(), [], []
 times = []
+
+# Main function
 def train_fn(index: int,
             model: torch.nn.Module,
             start_epoch: int,
@@ -132,6 +138,7 @@ def train_fn(index: int,
   print(f'Test {epoch+1} epoch : {end-start} s')
   test_losses.append(test_loss); test_accuracies.append(test_acc)
 
+# Function used to perform main function on TPUs
 def train_loop(model: torch.nn.Module,
                start_epoch: int,
                train_data_loader: torch_xla.distributed.parallel_loader.MpDeviceLoader,
