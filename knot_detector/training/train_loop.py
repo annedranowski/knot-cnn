@@ -8,6 +8,7 @@ from tqdm.notebook import tqdm as tqdmn
 
 import torch
 import torch_xla
+import torch_xla.core.xla_model as xm
 
 def train_step(model: torch.nn.Module,
                epoch: int,
@@ -25,14 +26,7 @@ def train_step(model: torch.nn.Module,
     for i, (X, y) in enumerate(tqdmn(data_loader)):
         start = time.time()
 
-        X, y = X.to(device).to(X.dtype), y.to(device).to(y.dtype)
-
         y_pred = model(X).squeeze(dim=1)
-
-        """for i in y_pred.detach().cpu().tolist():
-          y_pred_train.append(round(i))
-        for i in y.detach().cpu().tolist():
-          y_target_train.append(round(i))"""
 
         loss = loss_fn(y_pred, y.type(torch.float32))
         train_loss += loss
@@ -69,25 +63,15 @@ def test_step(model: torch.nn.Module,
               loss_fn: torch.nn.Module,
               accuracy_fn,
               scheduler: torch.optim.lr_scheduler = None,
-              threshold: float = 0.001,
-              device: torch.device = device,
-              save_path: str = None,
-              fold: int = None):
+              threshold: float = 0.001):
     test_loss, test_acc = 0, 0
     y_pred_test, y_target_test = [], []
     with torch.no_grad():
       model.eval()
       for X, y in data_loader:
           gc.collect()
-
-          X, y = X.to(device).to(X.dtype), y.to(device).to(y.dtype)
-
+        
           test_pred = model(X).squeeze(dim=1)
-
-          """for i in test_pred.detach().cpu().tolist():
-            y_pred_test.append(round(i))
-          for i in y.detach().cpu().tolist():
-            y_target_test.append(round(i))"""
 
           test_loss += loss_fn(test_pred, y.type(torch.float32))
           test_acc += accuracy_fn(y_true=y,
@@ -98,22 +82,6 @@ def test_step(model: torch.nn.Module,
 
       test_loss /= len(data_loader)
       test_acc /= len(data_loader)
-
-      if fold != None:
-        if test_acc > best_acc:
-          best_fold = fold
-          if save_path != None:
-            try:
-              os.mkdir(save_path + f'{model.__class__.__name__}_best.pth')
-            except:
-              pass
-            torch.save(model.state_dict(), save_path + f'/{model.__class__.__name__}_best.pth')
-      elif save_path != None:
-        try:
-          os.mkdir(save_path + f'{model.__class__.__name__}_best.pth')
-        except:
-          pass
-        torch.save(model.state_dict(), save_path + f'/{model.__class__.__name__}_best.pth')
 
       print("\nTest loss: {:.5f} | Test accuracy: {:.2f}%\n".format(test_loss, test_acc))
 
@@ -129,7 +97,7 @@ def train_fn(index: int,
             valid_dataloader: torch_xla.distributed.parallel_loader.MpDeviceLoader,
             loss_fn: torch.nn.Module,
             optimizer: torch.optim.Optimizer,
-            accuracy_fn: helper_functions = None,
+            accuracy_fn,
             num_epochs: int = None,
             scheduler: torch.optim.lr_scheduler = None):
   for epoch in tqdmn(range(num_epochs)):
@@ -170,7 +138,7 @@ def train_loop(model: torch.nn.Module,
                valid_dataloader: torch_xla.distributed.parallel_loader.MpDeviceLoader,
                loss_fn: torch.nn.Module,
                optimizer: torch.optim.Optimizer,
-               accuracy_fn: helper_functions = None,
+               accuracy_fn,
                num_epochs: int = None,
                scheduler: torch.optim.lr_scheduler = None):
   os.environ["XLA_TPU_DEVICES"] = ",".join([f"tpu_device_{i}" for i in range(8)])
