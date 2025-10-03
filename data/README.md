@@ -48,8 +48,8 @@ Each class label is the **minimum crossing number** of the knot:
 
 | Split | # Images | Classes |
 |-------|--------:|---------|
-| Train | **9,051** | 0, 3, 4, 5, 6, 7, 8, 9, 10 |
-| Test  | **49**   | 0, 3, 4, 5, 6, 7, 8, 9, 10, 11 |
+| Train | **7,240** | 0, 3, 4, 5, 6, 7, 8, 9, 10 |
+| Test  | **1811**   | 0, 3, 4, 5, 6, 7, 8, 9, 10, 11 |
 
 - The **train split** covers 9 different crossing-number classes.
 - The **test split** includes a few additional samples of higher crossings (10, 11).
